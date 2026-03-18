@@ -67,6 +67,57 @@ def upgrade() -> None:
             {'id': 3, 'name': 'admin', 'description': 'Admin user'},
         ]
     )
+
+    op.bulk_insert(
+        sa.table('permissions',
+                 sa.column('id', sa.Integer()),
+                 sa.column('code', sa.String()),
+                 sa.column('description', sa.String())),
+        [
+            {'id': 1, 'code': 'user.create', 'description': 'Создание пользователей'},
+            {'id': 2, 'code': 'user.read', 'description': 'Просмотр пользователей'},
+            {'id': 3, 'code': 'user.update', 'description': 'Редактирование пользователей'},
+            {'id': 4, 'code': 'user.delete', 'description': 'Удаление пользователей'},
+            {'id': 5, 'code': 'role.create', 'description': 'Создание ролей'},
+            {'id': 6, 'code': 'role.read', 'description': 'Просмотр ролей'},
+            {'id': 7, 'code': 'role.update', 'description': 'Редактирование ролей'},
+            {'id': 8, 'code': 'role.delete', 'description': 'Удаление ролей'},
+            {'id': 9, 'code': 'role.assign_permission', 'description': 'Назначение разрешений ролям'},
+            {'id': 10, 'code': 'permission.create', 'description': 'Создание разрешений'},
+            {'id': 11, 'code': 'permission.read', 'description': 'Просмотр разрешений'},
+            {'id': 12, 'code': 'permission.update', 'description': 'Редактирование разрешений'},
+            {'id': 13, 'code': 'permission.delete', 'description': 'Удаление разрешений'},
+        ]
+    )
+
+    op.bulk_insert(
+        sa.table('roles_permissions',
+                 sa.column('role_id', sa.Integer()),
+                 sa.column('permission_id', sa.Integer())),
+        [
+            # === Admin ===
+            {'role_id': 3, 'permission_id': 1},
+            {'role_id': 3, 'permission_id': 2},
+            {'role_id': 3, 'permission_id': 3},
+            {'role_id': 3, 'permission_id': 4},
+            {'role_id': 3, 'permission_id': 5},
+            {'role_id': 3, 'permission_id': 6},
+            {'role_id': 3, 'permission_id': 7},
+            {'role_id': 3, 'permission_id': 8},
+            {'role_id': 3, 'permission_id': 9},
+            {'role_id': 3, 'permission_id': 10},
+            {'role_id': 3, 'permission_id': 11},
+            {'role_id': 3, 'permission_id': 12},
+            {'role_id': 3, 'permission_id': 13},
+
+            # === Manager ===
+            {'role_id': 2, 'permission_id': 2},  # user.read
+
+            # === User — ТОЛЬКО СВОЙ ПРОФИЛЬ ===
+            {'role_id': 1, 'permission_id': 2},  # user.read
+        ]
+    )
+
     # ### end Alembic commands ###
 
 

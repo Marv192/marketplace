@@ -6,6 +6,7 @@ from sqlalchemy import pool
 from alembic import context
 
 from app.models import *
+from app.models.db import MIGRATION_DATABASE_URL
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -22,7 +23,7 @@ config.set_main_option("sqlalchemy.url", MIGRATION_DATABASE_URL)
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = metadata
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
