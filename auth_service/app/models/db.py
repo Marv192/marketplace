@@ -1,13 +1,8 @@
-import os
-
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
-
-DUMMY_DB_URL = 'postgresql+asyncpg://user:pass@localhost:5432/testdb'
-DATABASE_URL = os.getenv("DATABASE_URL", DUMMY_DB_URL)
-MIGRATION_DATABASE_URL = os.getenv("MIGRATION_DATABASE_URL", DUMMY_DB_URL)
+from app.config import DATABASE_URL, MIGRATION_DATABASE_URL
 
 engine = create_async_engine(DATABASE_URL, echo=True, pool_pre_ping=True)
 engine_for_migrations = create_engine(MIGRATION_DATABASE_URL, pool_pre_ping=True)

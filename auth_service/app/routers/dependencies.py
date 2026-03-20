@@ -1,10 +1,12 @@
 from fastapi import HTTPException, Depends, status, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import User, get_async_session, Role
 from app.utils.exceptions import PermissionDeniedError
+from app.utils.tokens import decode_token
 
 
 async def get_current_user(request: Request, session: AsyncSession = Depends(get_async_session)) -> User:
@@ -22,15 +24,17 @@ async def get_current_user(request: Request, session: AsyncSession = Depends(get
     return user
 
 
-def permission_required(permission_code: str):
-    async def check_permission(current_user: User = Depends(get_current_user)) -> User:
-        if not current_user.role:
-            raise PermissionDeniedError('User has no role assigned')
+security = HTTPBearer()
 
-        permission_codes = {p.code for p in current_user.role.permissions}
+def permission_required(permission_code: str):
+    async def check_permission(credentials: HTTPAuthorizationCredentials = Depends(security)) -> bool:
+        token = credentials.credentials
+        payload = decode_token(token)
+
+        permission_codes = payload.get('permissions', [])
 
         if permission_code not in permission_codes:
             raise PermissionDeniedError(f'Missing permission {permission_code}')
 
-        return current_user
+        return True
     return check_permission

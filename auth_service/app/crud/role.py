@@ -99,5 +99,13 @@ class CRUDRole(CRUDBase[Role, RoleCreate, RoleUpdate]):
         await db.commit()
         return db_obj
 
+    async def get_permissions(self, db: AsyncSession, *, role_id: int) -> list[str]:
+        result = await db.execute(select(Role).where(Role.id == role_id))
+        role = result.scalar_one_or_none()
+        if not role:
+            return []
+
+        return [p.code for p in role.permissions]
+
 
 role_crud = CRUDRole(Role)

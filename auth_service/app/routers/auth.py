@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, status, Depends, Request, HTTPException
+from fastapi import APIRouter, status, Depends, HTTPException
 from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,8 +27,12 @@ async def login(payload: UserLogin, session: AsyncSession = Depends(get_async_se
 
     session_id = str(uuid.uuid4())
 
-    access_token = await create_access_token(str(user.id), session_id)
-    refresh_token = await create_refresh_token(str(user.id), session_id)
+    permissions = []
+    if user.role and user.role.permissions:
+        permissions = [p.code for p in user.role.permissions]
+
+    access_token = await create_access_token(str(user.id), session_id, permissions)
+    refresh_token = await create_refresh_token(str(user.id), session_id, user.role_id)
 
     return {
         'access_token': access_token,
@@ -45,16 +49,11 @@ async def login(payload: UserLogin, session: AsyncSession = Depends(get_async_se
 
 
 @auth.post('/auth/refresh')
-async def token_refresh(request: Request,
+async def token_refresh(db: AsyncSession = Depends(get_async_session),
                         credentials: str = Depends(security)):
-    auth_header = request.headers.get('Authorization')
-    if not auth_header:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail='Missing or invalid authorization header')
+    refresh_token = credentials.credentials
 
-    refresh_token = auth_header.split()[1]
-
-    new_access_token, new_refresh_token = await refresh_tokens(refresh_token)
+    new_access_token, new_refresh_token = await refresh_tokens(refresh_token, db)
 
     return {
         'access_token': new_access_token,

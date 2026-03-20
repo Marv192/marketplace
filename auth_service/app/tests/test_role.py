@@ -30,6 +30,14 @@ def mock_role():
     return role
 
 @pytest.fixture()
+def mock_permission():
+    perm = MagicMock(spec=Permission)
+    perm.id = 1
+    perm.code = 'test.code'
+    perm.description = 'test description'
+    return perm
+
+@pytest.fixture()
 def mock_result():
     result = MagicMock()
     return result
@@ -185,3 +193,12 @@ class TestRole:
         mock_db_session.commit.assert_called_once()
         mock_db_session.rollback.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_get_permissions_success(self, mock_db_session, mock_role, mock_result, mock_permission):
+        mock_role.permissions = [mock_permission]
+        mock_result.scalar_one_or_none.return_value = mock_role
+        mock_db_session.execute.return_value = mock_result
+
+        result = await role_crud.get_permissions(db=mock_db_session, role_id=mock_role.id)
+
+        assert mock_permission.code in result
