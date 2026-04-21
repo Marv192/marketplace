@@ -1,0 +1,68 @@
+services:
+  auth:
+    build: ./auth_service
+    image: marketplace_auth
+    container_name: auth
+    restart: always
+    # применяем миграции и запускаем сервер
+    command: 'sh -c "alembic upgrade head && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"'
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres_auth:
+        condition: service_healthy
+      redis_auth:
+        condition: service_started
+    networks:
+      - backend_network
+    volumes:
+      - ./auth_service:/auth_service
+
+  postgres_auth:
+    image: postgres:16-alpine
+    container_name: postgres_auth
+    restart: always
+    volumes:
+      - postgres_data_auth:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${DATABASE_NAME}
+      - POSTGRES_USER=${DATABASE_USERNAME}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+
+    ports:
+      - "5432:5432"
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME} -d ${DATABASE_NAME}"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend_network
+
+  redis_auth:
+    image: redis:7-alpine
+    container_name: redis_auth
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 64mb
+      --maxmemory-policy allkeys-lru
+      --auto-aof-rewrite-percentage 100
+      --auto-aof-rewrite-min-size 16mb
+    volumes:
+      - redis_data_auth:/data
+    networks:
+      - backend_network
+
+volumes:
+  postgres_data_auth:
+  redis_data_auth:
+
+networks:
+  backend_network:
+    driver: bridge
