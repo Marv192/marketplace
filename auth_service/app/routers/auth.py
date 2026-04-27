@@ -1,17 +1,18 @@
 import uuid
 
 from fastapi import APIRouter, status, Depends, HTTPException
-from fastapi.security import HTTPBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import get_async_session
 from app.routers.validators import check_password, check_email_duplicate
 from app.schemas import UserRegister, UserLogin
 from app.crud import user_crud
-from app.utils.tokens import create_access_token, create_refresh_token, refresh_tokens
+from app.utils.tokens import create_access_token, create_refresh_token, refresh_tokens, revoke_tokens, decode_token
 
 auth = APIRouter()
 security = HTTPBearer()
+
 
 @auth.post('/auth/register', status_code=status.HTTP_201_CREATED)
 async def register_user(payload: UserRegister, session: AsyncSession = Depends(get_async_session)):
@@ -48,9 +49,23 @@ async def login(payload: UserLogin, session: AsyncSession = Depends(get_async_se
     }
 
 
+@auth.post('/auth/logout')
+async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    payload = decode_token(token=token)
+
+    session_id = payload.get('session_id')
+
+    if not session_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='session_id missing')
+
+    await revoke_tokens(session_id=session_id)
+    return {'message': 'Successfully logged out'}
+
+
 @auth.post('/auth/refresh')
 async def token_refresh(db: AsyncSession = Depends(get_async_session),
-                        credentials: str = Depends(security)):
+                        credentials: HTTPAuthorizationCredentials = Depends(security)):
     refresh_token = credentials.credentials
 
     new_access_token, new_refresh_token = await refresh_tokens(refresh_token, db)

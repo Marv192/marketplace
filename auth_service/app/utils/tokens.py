@@ -82,3 +82,7 @@ async def validate_token(token: str, token_type: str = 'access'):
         raise InvalidTokenError('Session revoked')
 
     return payload
+
+
+async def revoke_tokens(session_id: str):
+    await redis_client.delete(f"auth:access:{session_id}", f"auth:refresh:{session_id}")
