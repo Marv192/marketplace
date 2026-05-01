@@ -6,11 +6,12 @@ import pytest
 
 from app.utils import tokens
 from app.utils.exceptions import TokenExpiredError, InvalidTokenError
-from app.utils.tokens import create_access_token, JWT_ALGORITHM, create_refresh_token, refresh_tokens
+from app.utils.tokens import create_access_token, create_refresh_token, refresh_tokens
 
 TEST_USER_ID = "123e4567-e89b-12d3-a456-426614174000"
 TEST_SESSION_ID = "session-test-999"
 TEST_JWT_SECRET = "test_secret_key_1234567890123456"
+TEST_JWT_ALGORITHM = "HS256"
 TEST_PERMISSIONS = ["test_permission"]
 
 @pytest.fixture()
@@ -18,6 +19,7 @@ def mock_redis(mocker):
     tokens.JWT_SECRET = TEST_JWT_SECRET
     redis_mock = AsyncMock()
     mocker.patch('app.utils.tokens.redis_client', new=redis_mock)
+    mocker.patch('app.config.settings.jwt_secret', TEST_JWT_SECRET)
     return redis_mock
 
 @pytest.fixture()
@@ -38,7 +40,7 @@ class TestTokens:
         assert token is not None
         mock_redis.setex.assert_called_once()
 
-        payload = jwt.decode(token, TEST_JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, TEST_JWT_SECRET, algorithms=[TEST_JWT_ALGORITHM])
 
         assert 'iat' in payload
         assert 'exp' in payload
@@ -57,7 +59,7 @@ class TestTokens:
         assert token is not None
         mock_redis.setex.assert_called_once()
 
-        payload = jwt.decode(token, TEST_JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, TEST_JWT_SECRET, algorithms=[TEST_JWT_ALGORITHM])
 
 
         assert 'iat' in payload
@@ -81,7 +83,7 @@ class TestTokens:
             'exp': now + timedelta(days=7),
         }
 
-        old_refresh_token = jwt.encode(payload, TEST_JWT_SECRET, algorithm=JWT_ALGORITHM)
+        old_refresh_token = jwt.encode(payload, TEST_JWT_SECRET, algorithm=TEST_JWT_ALGORITHM)
         expected_key = f'auth:refresh:{TEST_SESSION_ID}'
 
         mock_redis.get.return_value = old_refresh_token
@@ -105,13 +107,13 @@ class TestTokens:
         mock_redis.get.assert_called_once_with(expected_key)
         assert mock_redis.setex.call_count == 2
 
-        new_access_payload = jwt.decode(new_access_token, TEST_JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        new_access_payload = jwt.decode(new_access_token, TEST_JWT_SECRET, algorithms=[TEST_JWT_ALGORITHM])
         assert new_access_payload['user_id'] == TEST_USER_ID
         assert new_access_payload['session_id'] == TEST_SESSION_ID
         lifetime = new_access_payload['exp'] - new_access_payload['iat']
         assert lifetime == 15 * 60  # 15 минут
 
-        new_refresh_payload = jwt.decode(new_refresh_token, TEST_JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        new_refresh_payload = jwt.decode(new_refresh_token, TEST_JWT_SECRET, algorithms=[TEST_JWT_ALGORITHM])
         assert new_refresh_payload['user_id'] == TEST_USER_ID
         assert new_refresh_payload['session_id'] == TEST_SESSION_ID
         lifetime = new_refresh_payload['exp'] - new_refresh_payload['iat']
@@ -128,7 +130,7 @@ class TestTokens:
             'exp': (now - timedelta(seconds=10)),
         }
 
-        expired_token = jwt.encode(payload, TEST_JWT_SECRET, algorithm=JWT_ALGORITHM)
+        expired_token = jwt.encode(payload, TEST_JWT_SECRET, algorithm=TEST_JWT_ALGORITHM)
 
         with pytest.raises(TokenExpiredError) as exc_info:
             await refresh_tokens(expired_token, db=mock_db_session)
@@ -146,7 +148,7 @@ class TestTokens:
             'exp': now + timedelta(days=7)
         }
 
-        token = jwt.encode(payload, TEST_JWT_SECRET, algorithm=JWT_ALGORITHM)
+        token = jwt.encode(payload, TEST_JWT_SECRET, algorithm=TEST_JWT_ALGORITHM)
         mock_redis.get.return_value = None
 
         with pytest.raises(InvalidTokenError) as exc_info:
@@ -165,7 +167,7 @@ class TestTokens:
             'exp': now + timedelta(days=7)
         }
 
-        invalid_token = jwt.encode(payload, 'wrong_secret_key_wrong_secret_key', algorithm=JWT_ALGORITHM)
+        invalid_token = jwt.encode(payload, 'wrong_secret_key_wrong_secret_key', algorithm=TEST_JWT_ALGORITHM)
 
         with pytest.raises(InvalidTokenError) as exc_info:
             await refresh_tokens(invalid_token, db=mock_db_session)

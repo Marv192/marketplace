@@ -1,11 +1,14 @@
 from datetime import datetime, timezone, timedelta
 
 import jwt
+import redis.asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import redis_client, JWT_SECRET, JWT_ALGORITHM
+from app.config import settings
 from app.crud import role_crud
 from app.utils.exceptions import TokenExpiredError, InvalidTokenError
+
+redis_client = aioredis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
 
 
 async def create_access_token(user_id: str, session_id: str, permissions: list[str],
@@ -20,13 +23,14 @@ async def create_access_token(user_id: str, session_id: str, permissions: list[s
         'type': 'access'
     }
 
-    access_token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    access_token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
     await redis_client.setex(f"auth:access:{session_id}", time_delta_minutes * 60, access_token)
 
     return access_token
 
-async def create_refresh_token(user_id: str, session_id, role_id, time_delta_days = 7):
+
+async def create_refresh_token(user_id: str, session_id, role_id, time_delta_days=7):
     now = datetime.now(timezone.utc)
     payload = {
         'user_id': user_id,
@@ -37,11 +41,12 @@ async def create_refresh_token(user_id: str, session_id, role_id, time_delta_day
         'type': 'refresh'
     }
 
-    refresh_token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    refresh_token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
     await redis_client.setex(f"auth:refresh:{session_id}", time_delta_days * 24 * 60 * 60, refresh_token)
 
     return refresh_token
+
 
 async def refresh_tokens(token: str, db: AsyncSession):
     payload = await validate_token(token, token_type='refresh')
@@ -56,7 +61,7 @@ async def refresh_tokens(token: str, db: AsyncSession):
 
 def decode_token(token: str):
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         return payload
     except jwt.ExpiredSignatureError:
         raise TokenExpiredError()
@@ -77,3 +82,7 @@ async def validate_token(token: str, token_type: str = 'access'):
         raise InvalidTokenError('Session revoked')
 
     return payload
+
+
+async def revoke_tokens(session_id: str):
+    await redis_client.delete(f"auth:access:{session_id}", f"auth:refresh:{session_id}")

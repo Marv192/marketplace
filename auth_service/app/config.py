@@ -1,11 +1,15 @@
-import os
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-import redis.asyncio as aioredis
 
-DUMMY_DB_URL = 'postgresql+asyncpg://user:pass@localhost:5432/testdb'
-DATABASE_URL = os.getenv("DATABASE_URL", DUMMY_DB_URL)
-MIGRATION_DATABASE_URL = os.getenv("MIGRATION_DATABASE_URL", DUMMY_DB_URL)
+class AuthSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
+    database_url: str
+    migration_database_url: str
+    jwt_secret: str
+    jwt_algorithm: str = Field(default="HS256")
+    redis_host: str = Field(default="redis_auth")
+    redis_port: int = Field(default=6379)
 
-redis_client = aioredis.Redis(host=os.environ.get('REDIS_HOST'), port=6379, decode_responses=True)
-JWT_SECRET = os.getenv('JWT_SECRET')
-JWT_ALGORITHM = 'HS256'
+
+settings = AuthSettings()

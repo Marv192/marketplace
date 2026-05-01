@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.crud import user_crud
 from app.models import User, get_async_session, Role
 from app.utils.exceptions import PermissionDeniedError
 from app.utils.tokens import decode_token
@@ -27,7 +28,8 @@ async def get_current_user(request: Request, session: AsyncSession = Depends(get
 security = HTTPBearer()
 
 def permission_required(permission_code: str):
-    async def check_permission(credentials: HTTPAuthorizationCredentials = Depends(security)) -> bool:
+    async def check_permission(credentials: HTTPAuthorizationCredentials = Depends(security),
+                               session: AsyncSession = Depends(get_async_session)) -> User:
         token = credentials.credentials
         payload = decode_token(token)
 
@@ -36,5 +38,8 @@ def permission_required(permission_code: str):
         if permission_code not in permission_codes:
             raise PermissionDeniedError(f'Missing permission {permission_code}')
 
-        return True
+        user_id = payload.get('user_id')
+        user = await user_crud.get_user_info(db=session, user_id=user_id)
+
+        return user
     return check_permission
