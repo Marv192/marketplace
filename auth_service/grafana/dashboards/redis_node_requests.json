@@ -4,17 +4,27 @@
   "metadata": {
     "name": "adtsf7d",
     "namespace": "default",
-    "uid": "6a3db4f3-7915-43da-a6bd-a96738b0d01c",
-    "resourceVersion": "1778080921872009",
-    "generation": 1,
-    "creationTimestamp": "2026-05-06T15:22:01Z",
+    "uid": "513820ef-f8e0-4a9a-a990-550177fc8700",
+    "resourceVersion": "1778245576673019",
+    "generation": 8,
+    "creationTimestamp": "2026-05-06T15:24:13Z",
     "labels": {
-      "grafana.app/deprecatedInternalID": "2908402926886912"
+      "grafana.app/deprecatedInternalID": "2908954064560128"
     },
     "annotations": {
-      "grafana.app/createdBy": "user:bfl2bm3k6rj7kf",
-      "grafana.app/folder": "",
-      "grafana.app/saved-from-ui": "Grafana v13.0.1 (a100054f)"
+      "grafana.app/createdBy": "access-policy:service",
+      "grafana.app/folder": "bfl2bm7s634lcb",
+      "grafana.app/managedBy": "classic-file-provisioning",
+      "grafana.app/managerAllowsEdits": "true",
+      "grafana.app/managerId": "Auth Service",
+      "grafana.app/saved-from-ui": "Grafana v13.0.1 (a100054f)",
+      "grafana.app/sourceChecksum": "28a98edb3a76f204cf788bd63e966011",
+      "grafana.app/sourcePath": "/etc/grafana/dashboards/redis_node_requests.json",
+      "grafana.app/sourceTimestamp": "1778080958000",
+      "grafana.app/updatedBy": "user:bfl2bm3k6rj7kf",
+      "grafana.app/updatedTimestamp": "2026-05-08T13:06:16Z",
+      "grafana.app/folderTitle": "Auth Service",
+      "grafana.app/folderUrl": "/dashboards/f/bfl2bm7s634lcb/auth-service"
     }
   },
   "spec": {
@@ -47,7 +57,7 @@
         "kind": "Panel",
         "spec": {
           "id": 2,
-          "title": "Redis operations per second",
+          "title": "Redis op/s, latency",
           "description": "",
           "links": [],
           "data": {
@@ -67,11 +77,33 @@
                       "spec": {
                         "editorMode": "builder",
                         "expr": "sum(rate(redis_ops_total[5m]))",
-                        "legendFormat": "__auto",
+                        "legendFormat": "op/s",
                         "range": true
                       }
                     },
                     "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "prometheus-auth"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "histogram_quantile(0.95, sum by(le) (rate(redis_latency_bucket[1h]))) *1000",
+                        "instant": false,
+                        "legendFormat": "p95 latency",
+                        "range": true
+                      }
+                    },
+                    "refId": "B",
                     "hidden": false
                   }
                 }
@@ -104,6 +136,7 @@
               },
               "fieldConfig": {
                 "defaults": {
+                  "unit": "reqps",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -151,7 +184,41 @@
                     }
                   }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "scope": "series",
+                      "options": "p95 latency"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.axisPlacement",
+                        "value": "right"
+                      },
+                      {
+                        "id": "unit",
+                        "value": "ms"
+                      },
+                      {
+                        "id": "thresholds",
+                        "value": {
+                          "mode": "absolute",
+                          "steps": [
+                            {
+                              "color": "green",
+                              "value": 0
+                            },
+                            {
+                              "color": "red",
+                              "value": 20
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -181,7 +248,7 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "(sum(increase(redis_ops_total{status=\"error\"}[5m])) or vector(0)) \n/ \n(sum(increase(redis_ops_total{}[5m])) or vector(1)) * 100",
-                        "legendFormat": "__auto",
+                        "legendFormat": "errors %",
                         "range": true
                       }
                     },
@@ -588,7 +655,7 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "sum(rate(node_network_receive_bytes_total{device!=\"lo\"}[5m])) * 8 / 1024 / 1024 ",
-                        "legendFormat": "__auto",
+                        "legendFormat": "traffic",
                         "range": true
                       }
                     },
@@ -703,7 +770,7 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "(\n  sum(rate(http_requests_total{status=\"5xx\"}[5m])) or vector(0)\n) \n/ \nsum(rate(http_requests_total[5m])) \n* 100",
-                        "legendFormat": "__auto",
+                        "legendFormat": "5xx errors",
                         "range": true
                       }
                     },
@@ -825,7 +892,7 @@
               "height": 6,
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-3"
+                "name": "panel-2"
               }
             }
           },
@@ -838,7 +905,7 @@
               "height": 6,
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-2"
+                "name": "panel-3"
               }
             }
           },
@@ -905,7 +972,7 @@
       "timezone": "browser",
       "from": "now-1h",
       "to": "now",
-      "autoRefresh": "",
+      "autoRefresh": "5s",
       "autoRefreshIntervals": [
         "5s",
         "10s",

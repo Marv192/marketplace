@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timezone, timedelta
 
 import jwt
@@ -6,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.crud import role_crud
-from prometheus.metrics import redis_ops
+from app.observability.metrics import redis_ops, redis_latency
 from app.utils.exceptions import TokenExpiredError, InvalidTokenError
 
 redis_client = aioredis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
@@ -26,13 +27,17 @@ async def create_access_token(user_id: str, session_id: str, permissions: list[s
 
     access_token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
+    latency_start = time.perf_counter()
     try:
         await redis_client.setex(f"auth:access:{session_id}", time_delta_minutes * 60, access_token)
-        redis_ops.labels(operation="SETEX", status="ok").inc()
+        redis_ops.labels(operation="SET", status="ok").inc()
 
     except Exception:
-        redis_ops.labels(operation="SETEX", status="error").inc()
+        redis_ops.labels(operation="SET", status="error").inc()
         raise
+
+    finally:
+        redis_latency.labels(operation="SET").observe(time.perf_counter() - latency_start)
 
     return access_token
 
@@ -50,13 +55,17 @@ async def create_refresh_token(user_id: str, session_id, role_id, time_delta_day
 
     refresh_token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
+    latency_start = time.perf_counter()
     try:
         await redis_client.setex(f"auth:refresh:{session_id}", time_delta_days * 24 * 60 * 60, refresh_token)
-        redis_ops.labels(operation="SETEX", status="ok").inc()
+        redis_ops.labels(operation="SET", status="ok").inc()
 
     except Exception:
-        redis_ops.labels(operation="SETEX", status="error").inc()
+        redis_ops.labels(operation="SET", status="error").inc()
         raise
+
+    finally:
+        redis_latency.labels(operation="SET").observe(time.perf_counter() - latency_start)
 
     return refresh_token
 
@@ -90,6 +99,7 @@ async def validate_token(token: str, token_type: str = 'access'):
 
     session_id = payload.get('session_id')
 
+    latency_start = time.perf_counter()
     try:
         stored_token = await redis_client.get(f"auth:{token_type}:{session_id}")
         if stored_token:
@@ -101,6 +111,9 @@ async def validate_token(token: str, token_type: str = 'access'):
         redis_ops.labels(operation="GET", status="error").inc()
         raise
 
+    finally:
+        redis_latency.labels(operation="GET").observe(time.perf_counter() - latency_start)
+
     if not stored_token:
         raise InvalidTokenError('Session revoked')
 
@@ -108,6 +121,7 @@ async def validate_token(token: str, token_type: str = 'access'):
 
 
 async def revoke_tokens(session_id: str):
+    latency_start = time.perf_counter()
     try:
         await redis_client.delete(f"auth:access:{session_id}", f"auth:refresh:{session_id}")
         redis_ops.labels(operation="DELETE", status="ok").inc()
@@ -115,3 +129,6 @@ async def revoke_tokens(session_id: str):
     except Exception:
         redis_ops.labels(operation="DELETE", status="error").inc()
         raise
+
+    finally:
+        redis_latency.labels(operation="DELETE").observe(time.perf_counter() - latency_start)
