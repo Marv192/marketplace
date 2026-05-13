@@ -59,9 +59,60 @@ services:
     networks:
       - backend_network
 
+  prometheus_auth:
+    image: prom/prometheus:v3.11.3
+    container_name: prometheus_auth
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./auth_service/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - backend_network
+    depends_on:
+      - auth
+
+  grafana_auth:
+    image: grafana/grafana:13.0.1
+    container_name: grafana_auth
+    restart: unless-stopped
+    environment:
+      - GF_LOG_LEVEL=debug
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./auth_service/grafana/datasources.yml:/etc/grafana/provisioning/datasources/prometheus.yml:ro
+      - ./auth_service/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./auth_service/grafana/dashboards:/etc/grafana/dashboards:ro
+    networks:
+      - backend_network
+    depends_on:
+      - prometheus_auth
+
+  node_exporter:
+    image: prom/node-exporter:v1.11.1
+    container_name: node_exporter
+    command:
+      - '--path.rootfs=/rootfs'
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    networks:
+      - backend_network
+
+
 volumes:
   postgres_data_auth:
   redis_data_auth:
+  prometheus_data:
+  grafana_data:
 
 networks:
   backend_network:

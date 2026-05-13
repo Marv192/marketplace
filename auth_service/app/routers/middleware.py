@@ -14,6 +14,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             '/auth/refresh',
             '/docs',
             '/openapi.json',
+            '/metrics'
         ]
 
     async def dispatch(self, request: Request, call_next):
