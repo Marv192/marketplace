@@ -4,8 +4,7 @@ services:
     image: marketplace_auth
     container_name: auth
     restart: always
-    # применяем миграции и запускаем сервер
-    command: 'sh -c "alembic upgrade head && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"'
+    command: 'sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log"'
     env_file:
       - .env
     ports:
@@ -107,12 +106,91 @@ services:
     networks:
       - backend_network
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.0
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
+    networks:
+      - backend_network
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:9.4.0
+    container_name: logstash
+    restart: unless-stopped
+    environment:
+      - "LS_JAVA_OPTS=-Xms512m -Xmx512m -Djava.net.preferIPv4Stack=true"
+    volumes:
+      - ./auth_service/elk-stack/logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    ports:
+      - "9600:9600"
+      - "12201:12201/udp"
+    depends_on:
+      - elasticsearch
+    networks:
+      - backend_network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.4.0
+    container_name: kibana
+    restart: unless-stopped
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - backend_network
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -s -f http://localhost:5601/api/status" ]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  kibana-init:
+    image: curlimages/curl:8.20.0
+    container_name: kibana-init
+    restart: no
+    depends_on:
+      kibana:
+        condition: service_healthy
+    volumes:
+      - ./auth_service/elk-stack/kibana/init.sh:/init.sh:ro
+      - ./auth_service/elk-stack/kibana/auth_dashboard.ndjson:/usr/share/kibana/data/auth_dashboard.ndjson:ro
+    command: ["/bin/sh", "/init.sh"]
+    networks:
+      - backend_network
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:9.4.0
+    container_name: filebeat
+    restart: unless-stopped
+    user: root
+    command: ["filebeat", "-e", "--strict.perms=false"]
+    volumes:
+      - ./auth_service/elk-stack/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - logstash
+    networks:
+      - backend_network
+
 
 volumes:
   postgres_data_auth:
   redis_data_auth:
   prometheus_data:
   grafana_data:
+  elastic_data:
 
 networks:
   backend_network:

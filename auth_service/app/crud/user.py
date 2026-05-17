@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import Optional, Union, Dict, Any
 from uuid import UUID
@@ -12,6 +13,8 @@ from app.models import User
 from app.schemas import UserRegister
 from app.schemas.user import UserUpdate, UserCreate
 from app.utils.password import generate_password_hash
+
+logger = logging.getLogger(__name__)
 
 
 class CRUDUser(CRUDBase[User, UserRegister, UserUpdate]):
@@ -33,7 +36,7 @@ class CRUDUser(CRUDBase[User, UserRegister, UserUpdate]):
 
         except Exception as err:
             await db.rollback()
-            print(f"Registration error: {err}")
+            logger.error(f"Registration error: {err}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                                 detail='Registration failed')
 
@@ -76,7 +79,7 @@ class CRUDUser(CRUDBase[User, UserRegister, UserUpdate]):
 
         except Exception as err:
             await db.rollback()
-            print(f"Update error: {err}")
+            logger.error(f"Update error: {err}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                                 detail='Update failed')
 
@@ -101,7 +104,7 @@ class CRUDUser(CRUDBase[User, UserRegister, UserUpdate]):
 
         except Exception as err:
             await db.rollback()
-            print(f"Delete error: {err}")
+            logger.error(f"Delete error: {err}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                                 detail='Delete failed')
 
