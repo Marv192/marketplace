@@ -1,0 +1,26 @@
+filebeat.inputs:
+  - type: filestream
+    id: auth-logs-input
+    paths:
+      - '/var/lib/docker/containers/*/*-json.log'
+
+    processors:
+      - add_docker_metadata: ~
+      - drop_event:
+          when:
+            not:
+              equals:
+                container.name: "auth"
+
+    json.keys_under_root: true
+    json.add_error_key: true
+    json.message_key: log
+    json.overwrite_keys: true
+
+    scan_frequency: 5s
+    harvester_limit: 5
+
+output.logstash:
+  hosts: ["logstash:5044"]
+
+logging.level: info

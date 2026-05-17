@@ -1,11 +1,13 @@
-from contextlib import asynccontextmanager
+import logging
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Security, Request
 from fastapi.security import HTTPBearer
 from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette import status
 
+from app.logging.logging_config import setup_json_logging
 from app.routers.auth import auth
 from app.models import engine
 from app.routers.middleware import AuthMiddleware
@@ -14,20 +16,23 @@ from app.routers.roles import roles
 from app.routers.users import users
 from app.utils.exceptions import PermissionDeniedError, InvalidTokenError, TokenExpiredError
 
+setup_json_logging()
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
         await engine.connect()
-        print("Database connected")
+        logger.info("Database connected")
     except Exception as e:
-        print(f"Ошибка во время подключения к БД: {e}")
+        logger.error(f"Database connection error: {e}")
         raise
     yield
     try:
         await engine.disconnect()
     except Exception as e:
-        print(f"Ошибка при отключении БД: {e}")
+        logger.error(f"Database disconnect error: {e}")
 
 
 security = HTTPBearer()
